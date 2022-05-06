@@ -1,0 +1,159 @@
+---
+title: "project 2 classification"
+author: "Xinwei Hu"
+date: "5/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+fetal <- read.csv("fetal_health.csv")
+nrow(fetal)
+heart = na.omit(fetal)
+nrow(heart) #to judge that there is no NAs
+
+set.seed(412)
+library(bootstrap)
+nboot = 1000
+# Create training and validation sets.
+train.index <- sample(1:nrow(fetal), nrow(fetal)*0.7)  
+train.df <- heart[train.index,]
+test.df <- heart[-train.index,]
+head(train.df)
+
+```
+
+# Logistic Regression
+```{r}
+set.seed(412)
+require(nnet)
+multi.fitting <- multinom(fetal_health~., data=train.df)
+logistics.pred = predict(multi.fitting, newdata = test.df, "class")
+
+table(logistics.pred, test.df$fetal_health)
+mean(test.df$fetal_health==logistics.pred) #accuracy rate
+
+
+#bootstrap
+set.seed(412)
+test.df$log <- test.df$fetal_health==logistics.pred
+test.df$log <- ifelse(test.df$log == "TRUE", 1, 0)
+
+log_m = function(x){mean(x)}
+log_bi <- bootstrap(test.df$log, nboot, log_m)
+log_b <- mean(log_bi$thetastar)
+log_b
+test.df <- test.df[,-18]
+
+```
+
+# Linear Discriminant Analysis
+```{r}
+#build LDA model
+library(MASS)
+set.seed(412)
+lda.fit=lda(fetal_health~.,data=train.df)
+lda.fit
+plot(lda.fit)
+
+lda.pred=predict(lda.fit, test.df)
+names(lda.pred)
+lda.class=lda.pred$class
+table(lda.class, test.df$fetal_health) #confusion matrix
+mean(lda.class==test.df$fetal_health) #accuracy rate
+
+#bootstrap
+set.seed(412)
+test.df$lda <- lda.class==test.df$fetal_health
+test.df$lda <- ifelse(test.df$lda == "TRUE", 1, 0)
+
+lda_m = function(x){mean(x)}
+lda_bi <- bootstrap(test.df$lda, nboot, lda_m)
+lda_b <- mean(lda_bi$thetastar)
+lda_b
+test.df <- test.df[,-18]
+```
+
+# Quadratic Discriminant Analysis
+```{r}
+set.seed(412)
+qda.fit=qda(fetal_health~.,data=train.df)
+qda.fit
+qda.class=predict(qda.fit,test.df)$class
+table(qda.class,test.df$fetal_health)
+mean(qda.class==test.df$fetal_health) #accuracy rate
+
+#bootstrap
+set.seed(412)
+test.df$qda <- qda.class==test.df$fetal_health
+test.df$qda <- ifelse(test.df$qda == "TRUE", 1, 0)
+
+qda_m = function(x){mean(x)}
+qda_bi <- bootstrap(test.df$qda, nboot, qda_m)
+qda_b <- mean(qda_bi$thetastar)
+qda_b
+test.df <- test.df[,-18]
+```
+
+# K-Nearest Neighbors
+```{r}
+set.seed(412)
+# K-Nearest Neighbors
+library(class)
+
+accurate_rate={}
+i=0
+while(i<=20){
+  i=i+1
+  knn.prediction = knn(train.df[,-17], test.df[,-17], train.df[,17], k=i)
+  accurate_rate = c(accurate_rate, mean(test.df$fetal_health == knn.prediction))
+}
+which(accurate_rate==max(accurate_rate))
+max(accurate_rate)
+
+#bootstrap
+knn.prediction = knn(train.df[,-17], test.df[,-17], train.df[,17], k=1)
+table(test.df$fetal_health, knn.prediction)
+
+set.seed(412)
+test.df$knn <- test.df$fetal_health == knn.prediction
+test.df$knn <- ifelse(test.df$knn == "TRUE", 1, 0)
+
+knn_m = function(x){mean(x)}
+knn_bi <- bootstrap(test.df$knn, nboot, knn_m)
+knn_b <- mean(knn_bi$thetastar)
+knn_b
+test.df <- test.df[,-18]
+```
+
+
+# K-means
+```{r}
+library(tidyverse)
+library(cluster)
+library(factoextra)
+set.seed(412)
+#scale the data set
+sd.fetal=scale(fetal)
+
+#k-means
+fviz_nbclust(sd.fetal, kmeans, method = "wss")
+
+km.out = kmeans(sd.fetal, 4, nstart=20)
+fviz_cluster(km.out, data = sd.fetal)
+
+km.clusters = km.out$cluster
+km.clusters
+
+km.out$centers
+
+```
+
+
+
+
+
+
